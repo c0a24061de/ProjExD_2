@@ -1,3 +1,4 @@
+import math  # 追加
 import os
 import random 
 import sys
@@ -72,20 +73,19 @@ def get_kk_imgs() -> dict[tuple[int, int], pg.Surface]:
     """
     移動量の合計タプルをキー，rotozoomしたSurfaceを値とした辞書を返す
     """
-    img0 = pg.image.load("fig/3.png")  # デフォ
+    img0 = pg.image.load("fig/3.png")  # デフォルト（左向き）
     img = pg.transform.rotozoom(img0, 0, 0.9)
     
-    # 左向きを基準に回転・反転を作成
     dir_imgs = {
-        (0, 0): img,                                                 # 停止
-        (-5, 0): img,                                                # 左
-        (-5, -5): pg.transform.rotozoom(img, -45, 1.0),              # 左上
-        (0, -5): pg.transform.rotozoom(img, -90, 1.0),               # 上
-        (+5, -5): pg.transform.rotozoom(pg.transform.flip(img, True, False), 45, 1.0), # 右上
-        (+5, 0): pg.transform.flip(img, True, False),                # 右
-        (+5, +5): pg.transform.rotozoom(pg.transform.flip(img, True, False), -45, 1.0),# 右下
-        (0, +5): pg.transform.rotozoom(img, 90, 1.0),                # 下
-        (-5, +5): pg.transform.rotozoom(img, 45, 1.0),               # 左下
+        (0, 0): img,
+        (-5, 0): img,
+        (-5, -5): pg.transform.rotozoom(img, -45, 1.0),
+        (0, -5): pg.transform.rotozoom(img, -90, 1.0),
+        (+5, -5): pg.transform.rotozoom(pg.transform.flip(img, True, False), 45, 1.0),
+        (+5, 0): pg.transform.flip(img, True, False),
+        (+5, +5): pg.transform.rotozoom(pg.transform.flip(img, True, False), -45, 1.0),
+        (0, +5): pg.transform.rotozoom(img, 90, 1.0),
+        (-5, +5): pg.transform.rotozoom(img, 45, 1.0),
     }
     return dir_imgs
 
@@ -96,17 +96,15 @@ def main():
     bg_img = pg.image.load("fig/pg_bg.jpg")    
     
     kk_imgs = get_kk_imgs()
-    kk_img = kk_imgs[(0, 0)]  # 初期画像
-    
+    kk_img = kk_imgs[(0, 0)]
     kk_rct = kk_img.get_rect()
     kk_rct.center = 300, 200
     
     bb_accs, bb_imgs = init_bb_imgs()
-    
     bb_img = bb_imgs[0]
     bb_rct = bb_img.get_rect()
     bb_rct.center = random.randint(0, WIDTH), random.randint(0, HEIGHT)
-    vx, vy = +5, +5
+    vx, vy = +5, +5  # 初期速度
     
     clock = pg.time.Clock()
     tmr = 0
@@ -129,31 +127,43 @@ def main():
                 sum_mv[1] += mv[1]
         
         kk_img = kk_imgs[tuple(sum_mv)]
-        
         kk_rct.move_ip(sum_mv)
         
         if check_bound(kk_rct) != (True, True):
             kk_rct.move_ip(-sum_mv[0], -sum_mv[1])
         screen.blit(kk_img, kk_rct)
                 
+        # --- 追従（ホーミング）処理 ---
+        # こうかとんと爆弾の座標の差を計算
+        dx = kk_rct.centerx - bb_rct.centerx
+        dy = kk_rct.centery - bb_rct.centery
+        # 距離を計算（三平方の定理）
+        dist = math.sqrt(dx**2 + dy**2)
+        
+        if dist != 0:
+            # 距離で割って正規化（長さ1のベクトルにする）し、基本速度5を掛ける
+            # ※ここでvx, vyを更新することで、常にプレイヤーの方向を向く
+            vx = (dx / dist) * 5
+            vy = (dy / dist) * 5
+        # ---------------------------
+
+        # 加速・拡大処理（更新されたvx, vyを使用）
         avx = vx * bb_accs[min(tmr // 500, 9)]
         avy = vy * bb_accs[min(tmr // 500, 9)]
 
         bb_img = bb_imgs[min(tmr // 500, 9)]
-
         bb_rct.width = bb_img.get_width()
         bb_rct.height = bb_img.get_height()
         
         bb_rct.move_ip(avx, avy)
 
-        yoko, tate = check_bound(bb_rct)
-        if not yoko:
-            vx *= -1
-        if not tate:
-            vy *= -1
+        # 追従時は壁反射は基本的に不要（プレイヤーを追いかけるため画面内に留まる傾向がある）
+        # もし壁からはみ出させない処理が必要なら以下のように位置だけ補正する
+        # yoko, tate = check_bound(bb_rct)
+        # if not yoko: ...
         
         screen.blit(bb_img, bb_rct)
-
+        
         pg.display.update()
         tmr += 1
         clock.tick(50)
