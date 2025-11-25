@@ -42,6 +42,7 @@ def gameover(screen: pg.Surface) -> None:
     text = font.render("Game Over", True, (255, 255, 255))
     text_rct = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
 
+    # 泣いているこうかとん（左右に配置）
     cry_img = pg.image.load("fig/8.png")
     cry_rct = cry_img.get_rect(center=(WIDTH // 2 - 200, HEIGHT // 2))
     cry_rct2 = cry_img.get_rect(center=(WIDTH // 2 + 200, HEIGHT // 2))
@@ -52,7 +53,7 @@ def gameover(screen: pg.Surface) -> None:
     screen.blit(cry_img, cry_rct2)
     pg.display.update()
 
-    time.sleep(5)
+    time.sleep(5) #5秒間表示
 
 
 def init_bb_imgs() -> tuple[list[int], list[pg.Surface]]:
@@ -60,8 +61,8 @@ def init_bb_imgs() -> tuple[list[int], list[pg.Surface]]:
     サイズの異なる爆弾画像と加速度リストを返す
     """
     bb_imgs = []
-    bb_accs = [a for a in range(1, 11)]
-    for r in range(1, 11):
+    bb_accs = [a for a in range(1, 11)] #加速倍率
+    for r in range(1, 11): #大きさを変化させる
         bb_img = pg.Surface((20*r, 20*r))
         pg.draw.circle(bb_img, (255, 0, 0), (10*r, 10*r), 10*r)
         bb_img.set_colorkey((0, 0, 0)) 
@@ -76,6 +77,7 @@ def get_kk_imgs() -> dict[tuple[int, int], pg.Surface]:
     img0 = pg.image.load("fig/3.png")  # デフォルト（左向き）
     img = pg.transform.rotozoom(img0, 0, 0.9)
     
+    # 向きに応じて回転・反転させた画像を用意
     dir_imgs = {
         (0, 0): img,
         (-5, 0): img,
@@ -95,11 +97,13 @@ def main():
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load("fig/pg_bg.jpg")    
     
+    #方向別に画像を準備
     kk_imgs = get_kk_imgs()
     kk_img = kk_imgs[(0, 0)]
     kk_rct = kk_img.get_rect()
     kk_rct.center = 300, 200
     
+    #加速度を準備
     bb_accs, bb_imgs = init_bb_imgs()
     bb_img = bb_imgs[0]
     bb_rct = bb_img.get_rect()
@@ -115,10 +119,12 @@ def main():
                 return
         screen.blit(bg_img, [0, 0]) 
 
+        #衝突判定
         if kk_rct.colliderect(bb_rct):
             gameover(screen)
             return
 
+        #操作
         key_lst = pg.key.get_pressed()
         sum_mv = [0, 0]
         for key, mv in DELTA.items():
@@ -145,23 +151,16 @@ def main():
             # ※ここでvx, vyを更新することで、常にプレイヤーの方向を向く
             vx = (dx / dist) * 5
             vy = (dy / dist) * 5
-        # ---------------------------
 
         # 加速・拡大処理（更新されたvx, vyを使用）
         avx = vx * bb_accs[min(tmr // 500, 9)]
         avy = vy * bb_accs[min(tmr // 500, 9)]
 
         bb_img = bb_imgs[min(tmr // 500, 9)]
-        bb_rct.width = bb_img.get_width()
-        bb_rct.height = bb_img.get_height()
-        
-        bb_rct.move_ip(avx, avy)
+        bb_rct = bb_img.get_rect(center=bb_rct.center)
 
-        # 追従時は壁反射は基本的に不要（プレイヤーを追いかけるため画面内に留まる傾向がある）
-        # もし壁からはみ出させない処理が必要なら以下のように位置だけ補正する
-        # yoko, tate = check_bound(bb_rct)
-        # if not yoko: ...
-        
+        #爆弾移動
+        bb_rct.move_ip(avx, avy)
         screen.blit(bb_img, bb_rct)
         
         pg.display.update()
